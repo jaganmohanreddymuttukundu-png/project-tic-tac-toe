@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tic Tac Toe</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: 'Poppins', sans-serif;
+  background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  color: white;
+}
+
+.container {
+  width: 440px;
+  padding: 25px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 0 40px rgba(0,0,0,0.6);
+  text-align: center;
+}
+
+h1 {
+  margin-bottom: 10px;
+}
+
+.mode-container {
+  margin: 15px 0;
+}
+
+select {
+  width: 75%;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(255,255,255,0.1);
+  color: white;
+}
+
+.scoreboard {
+  display: flex;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.score {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.08);
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, 110px);
+  gap: 15px;
+  justify-content: center;
+}
+
+.cell {
+  width: 110px;
+  height: 110px;
+  font-size: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.07);
+  border-radius: 15px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.cell:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 15px #00c6ff;
+}
+
+.cell.x { color: #00c6ff; }
+.cell.o { color: #ff6ec4; }
+
+.winner {
+  background: #00ffcc !important;
+  color: black !important;
+}
+
+#status {
+  margin: 15px 0;
+}
+
+/* Buttons */
+.btn-group {
+  display: flex;
+  gap: 15px;
+  margin-top: 10px;
+}
+
+.btn-group button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.btn-group button:first-child {
+  background: linear-gradient(135deg, #36d1dc, #5b86e5);
+}
+
+.btn-group button:last-child {
+  background: linear-gradient(135deg, #ff7e5f, #feb47b);
+}
+
+.btn-group button:hover {
+  transform: scale(1.08);
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h1>✨ Tic Tac Toe ✨</h1>
+
+  <div class="mode-container">
+    <select id="mode">
+      <option value="player">👥 2 Player</option>
+      <option value="ai">🤖 vs AI</option>
+    </select>
+  </div>
+
+  <div class="scoreboard">
+    <div class="score">X: <span id="scoreX">0</span></div>
+    <div class="score">O: <span id="scoreO">0</span></div>
+  </div>
+
+  <div class="board" id="board"></div>
+
+  <div id="status"></div>
+
+  <div class="btn-group">
+    <button onclick="resetGame()">Restart</button>
+    <button onclick="resetScores()">Reset Score</button>
+  </div>
+</div>
+
+<script>
+const boardEl = document.getElementById("board");
+const statusText = document.getElementById("status");
+const mode = document.getElementById("mode");
+
+let board = Array(9).fill("");
+let currentPlayer = "X";
+let gameActive = true;
+
+let scoreX = localStorage.getItem("scoreX") || 0;
+let scoreO = localStorage.getItem("scoreO") || 0;
+
+document.getElementById("scoreX").textContent = scoreX;
+document.getElementById("scoreO").textContent = scoreO;
+
+const winPatterns = [
+ [0,1,2],[3,4,5],[6,7,8],
+ [0,3,6],[1,4,7],[2,5,8],
+ [0,4,8],[2,4,6]
+];
+
+function createBoard() {
+  boardEl.innerHTML = "";
+  board.forEach((_, i) => {
+    const cell = document.createElement("div");
+    cell.classList.add("cell");
+    cell.dataset.index = i;
+    cell.addEventListener("click", handleClick);
+    boardEl.appendChild(cell);
+  });
+}
+
+createBoard();
+statusText.textContent = "Player X Turn";
+
+function handleClick(e) {
+  const i = e.target.dataset.index;
+  if (board[i] || !gameActive) return;
+
+  makeMove(i, currentPlayer);
+
+  if (mode.value === "ai" && gameActive && currentPlayer === "O") {
+    setTimeout(aiMove, 400);
+  }
+}
+
+function makeMove(i, player) {
+  board[i] = player;
+
+  const cell = boardEl.children[i];
+  cell.textContent = player;
+  cell.classList.add(player.toLowerCase());
+
+  checkWinner();
+}
+
+function aiMove() {
+  let bestScore = -Infinity;
+  let move;
+
+  for (let i = 0; i < 9; i++) {
+    if (board[i] === "") {
+      board[i] = "O";
+      let score = minimax(board, 0, false);
+      board[i] = "";
+      if (score > bestScore) {
+        bestScore = score;
+        move = i;
+      }
+    }
+  }
+  makeMove(move, "O");
+}
+
+function minimax(board, depth, isMax) {
+  let res = checkWinnerSimple();
+  if (res !== null) {
+    const scores = { O: 1, X: -1, draw: 0 };
+    return scores[res];
+  }
+
+  if (isMax) {
+    let best = -Infinity;
+    for (let i = 0; i < 9; i++) {
+      if (board[i] === "") {
+        board[i] = "O";
+        best = Math.max(best, minimax(board, depth+1, false));
+        board[i] = "";
+      }
+    }
+    return best;
+  } else {
+    let best = Infinity;
+    for (let i = 0; i < 9; i++) {
+      if (board[i] === "") {
+        board[i] = "X";
+        best = Math.min(best, minimax(board, depth+1, true));
+        board[i] = "";
+      }
+    }
+    return best;
+  }
+}
+
+function checkWinnerSimple() {
+  for (let p of winPatterns) {
+    let [a,b,c] = p;
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+      return board[a];
+    }
+  }
+  if (!board.includes("")) return "draw";
+  return null;
+}
+
+function checkWinner() {
+  let winner = null;
+
+  for (let p of winPatterns) {
+    let [a,b,c] = p;
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+      winner = board[a];
+      p.forEach(i => boardEl.children[i].classList.add("winner"));
+    }
+  }
+
+  if (winner) {
+    statusText.textContent = `🎉 ${winner} Wins!`;
+    updateScore(winner);
+    gameActive = false;
+    setTimeout(resetGame, 1500);
+    return;
+  }
+
+  if (!board.includes("")) {
+    statusText.textContent = "Draw!";
+    gameActive = false;
+    setTimeout(resetGame, 1500);
+    return;
+  }
+
+  currentPlayer = currentPlayer === "X" ? "O" : "X";
+  statusText.textContent = `Player ${currentPlayer} Turn`;
+}
+
+function updateScore(winner) {
+  if (winner === "X") scoreX++;
+  else scoreO++;
+
+  localStorage.setItem("scoreX", scoreX);
+  localStorage.setItem("scoreO", scoreO);
+
+  document.getElementById("scoreX").textContent = scoreX;
+  document.getElementById("scoreO").textContent = scoreO;
+}
+
+function resetGame() {
+  board = Array(9).fill("");
+  currentPlayer = "X";
+  gameActive = true;
+  createBoard();
+  statusText.textContent = "Player X Turn";
+}
+
+function resetScores() {
+  scoreX = 0;
+  scoreO = 0;
+
+  localStorage.setItem("scoreX", scoreX);
+  localStorage.setItem("scoreO", scoreO);
+
+  document.getElementById("scoreX").textContent = scoreX;
+  document.getElementById("scoreO").textContent = scoreO;
+}
+</script>
+
+</body>
+</html>
